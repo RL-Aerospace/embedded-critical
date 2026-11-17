@@ -3,6 +3,8 @@ name = "system-firmware"
 version = "0.0.0"
 description = "Repository tooling for the RLA system firmware (not a distributable package)."
 requires-python = ">=3.12"
+license = "GPL-3.0-or-later"
+license-files = ["LICENSE"]
 dependencies = []
 
 [tool.uv]
