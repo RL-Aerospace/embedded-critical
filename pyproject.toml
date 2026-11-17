@@ -1,0 +1,9 @@
+[project]
+name = "system-firmware"
+version = "0.0.0"
+description = "Repository tooling for the RLA system firmware (not a distributable package)."
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false

@@ -1,0 +1,7 @@
+# Personal Claude Code configuration (per developer, never committed)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# uv / Python environment for repo tooling
+.venv/
+__pycache__/

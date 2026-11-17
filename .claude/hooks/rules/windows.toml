@@ -1,0 +1,98 @@
+# Recursive-delete policy for Windows hosts, read by .claude/hooks/guard.py.
+#
+# On Windows Claude runs two shells, so both are covered here:
+#   - the Bash tool runs Git Bash (POSIX commands: rm, find, ...), dialect "bash"
+#   - the PowerShell tool runs Windows PowerShell 5.1, dialect "powershell"
+#   - text passed to `cmd /c ...` is analyzed as dialect "cmd"
+#
+# A matching command is denied unless every target resolves inside a
+# whitelisted folder. Anything the guard cannot resolve is denied.
+
+schema = 1
+os = "windows"
+
+[whitelist]
+# Folders, relative to the repo root (forward slashes), in which recursive
+# deletes are permitted. The folder itself and everything under it are allowed.
+# Example: paths = ["build", "out/windows"]
+paths = []
+
+[[delete]]
+name = "rm -r (Git Bash coreutils)"
+# Also applied to PowerShell: `rm -rf x` there is the Remove-Item alias, and
+# checking both parsers is the conservative choice.
+dialects = ["bash", "powershell"]
+commands = ["rm"]
+parser = "posix-rm"
+recursive_short = ["r", "R"]
+recursive_long = ["--recursive"]
+
+[[delete]]
+name = "Remove-Item -Recurse (PowerShell)"
+dialects = ["powershell"]
+commands = ["remove-item", "rm", "ri", "del", "erase", "rd", "rmdir"]
+parser = "powershell-remove"
+# Parameter names; any unambiguous prefix (e.g. -r, -Rec) is matched.
+recursive_params = ["-recurse"]
+path_params = ["-path", "-literalpath", "-lp", "-pspath"]
+value_params = ["-filter", "-include", "-exclude", "-credential", "-stream"]
+# Note: Remove-Item fed from the pipeline (gci -r | Remove-Item) is always denied.
+
+[[delete]]
+name = "rd/rmdir/del/erase /s (cmd.exe)"
+dialects = ["cmd"]
+commands = ["rd", "rmdir", "del", "erase"]
+parser = "cmd-switch"
+recursive_switches = ["/s"]
+
+[[delete]]
+name = "find -delete / -exec rm (Git Bash findutils)"
+# PowerShell is not listed: there `find` is C:\Windows\System32\find.exe (text search).
+dialects = ["bash"]
+commands = ["find"]
+parser = "find"
+delete_actions = ["-delete"]
+exec_actions = ["-exec", "-execdir", "-ok", "-okdir"]
+exec_delete_commands = ["rm", "rmdir", "rimraf"]
+# Commands run by -exec whose effect cannot be inspected; these are denied.
+exec_opaque_commands = ["sh", "bash", "zsh", "dash", "xargs", "python", "python3", "py",
+                        "perl", "ruby", "node", "powershell", "pwsh", "cmd"]
+
+[[delete]]
+name = "rimraf"
+dialects = ["bash", "powershell", "cmd"]
+commands = ["rimraf"]
+parser = "targets"
+
+[git_clean]
+# Short flags of `git clean` that make it delete directories or ignored trees
+# (bundles such as -fdx count). `git clean -n/--dry-run` is not a delete.
+recursive_flags = ["d", "x", "X"]
+
+[inline_code]
+# Interpreters whose arguments are scanned for recursive-delete code
+# (e.g. python -c "import shutil; shutil.rmtree('x')"). Matches are denied.
+interpreters = ["python", "python3", "py", "node", "perl", "ruby"]
+patterns = [
+    'rmtree',
+    'remove_tree',
+    'removedirs',
+    'rmSync',
+    'fs\.rm\b',
+    'fs\.rmdir',
+    'rimraf',
+    'Remove-Item',
+    'remove_dir_all',
+    'rm_r\b',
+    'rm_rf',
+    '\brm\s+-[A-Za-z]*[rR]',
+    'Directory\]?::Delete',
+    'Directory\.Delete',
+]
+
+[[command_pattern]]
+name = ".NET recursive delete (PowerShell)"
+dialects = ["powershell"]
+# Matches command words such as [IO.Directory]::Delete, $dir.Delete,
+# [Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory.
+regex = '(\]::|\.)Delete(Directory)?$'
